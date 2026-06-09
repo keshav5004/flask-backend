@@ -1,0 +1,300 @@
+"""
+Similarity-based phishing and typosquatting detection service.
+
+Analyzes URLs that are not found in the exact-match blacklist and
+generates a risk score based on multiple heuristic signals:
+  - Fuzzy string similarity to known malicious domains
+  - Suspicious keyword presence (login, secure, verify, bank, etc.)
+  - Suspicious TLD usage (.xyz, .tk, .ml, etc.)
+  - IP address usage instead of domain
+  - Excessive subdomain depth
+  - Homoglyph / lookalike character substitutions
+  - Hyphen abuse patterns
+"""
+
+import re
+import difflib
+from urllib.parse import urlparse
+from typing import List, Tuple, Dict, Optional
+
+
+# ---------------------------------------------------------------------------
+# Risk level thresholds
+# ---------------------------------------------------------------------------
+RISK_LEVELS = {
+    "safe":       (0,  20),
+    "low":        (21, 40),
+    "medium":     (41, 60),
+    "high":       (61, 80),
+    "malicious":  (81, 100),
+}
+
+# Suspicious keywords frequently abused in phishing domains
+SUSPICIOUS_KEYWORDS = [
+    "login", "signin", "sign-in", "verify", "secure", "account", "update",
+    "confirm", "banking", "paypal", "amazon", "apple", "google", "microsoft",
+    "facebook", "instagram", "netflix", "ebay", "wallet", "crypto", "support",
+    "helpdesk", "password", "credential", "auth", "access", "validate",
+    "recover", "unlock", "suspend", "limited", "alert", "urgent", "free",
+    "winner", "prize", "reward", "bonus", "offer", "click", "download",
+]
+
+# TLDs commonly abused in phishing/spam campaigns
+SUSPICIOUS_TLDS = {
+    ".xyz", ".tk", ".ml", ".ga", ".cf", ".gq", ".pw", ".top", ".club",
+    ".online", ".site", ".website", ".tech", ".link", ".info", ".bid",
+    ".win", ".loan", ".date", ".faith", ".review", ".trade", ".webcam",
+    ".stream", ".gdn", ".men", ".work", ".party", ".download",
+}
+
+# Homoglyph map: lookalike Unicode/ASCII substitutions
+HOMOGLYPHS = {
+    "0": "o", "1": "l", "3": "e", "4": "a", "5": "s",
+    "6": "g", "7": "t", "8": "b", "9": "g",
+    "rn": "m", "vv": "w",
+}
+
+# Legitimate popular domains — used to detect brand impersonation
+POPULAR_DOMAINS = [
+    "google.com", "facebook.com", "amazon.com", "apple.com", "microsoft.com",
+    "paypal.com", "netflix.com", "instagram.com", "twitter.com", "linkedin.com",
+    "github.com", "youtube.com", "reddit.com", "wikipedia.org", "ebay.com",
+    "yahoo.com", "bing.com", "adobe.com", "dropbox.com", "spotify.com",
+    "tiktok.com", "whatsapp.com", "telegram.org", "discord.com", "twitch.tv",
+]
+
+
+class SimilarityChecker:
+    """
+    Performs multi-signal similarity analysis on a URL to determine
+    how likely it is to be a phishing / lookalike site.
+    """
+
+    def __init__(self, blacklist: set):
+        """
+        Args:
+            blacklist: Set of normalized malicious domains (from CSVBlacklistChecker).
+        """
+        self.blacklist = blacklist
+        # Combine known-bad domains with popular targets for similarity comparison
+        self._comparison_pool = list(blacklist) + POPULAR_DOMAINS
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def analyze(self, url: str) -> Dict:
+        """
+        Full analysis pipeline for a single URL.
+
+        Returns a dict with:
+            risk_score      int  0-100
+            risk_level      str  safe | low | medium | high | malicious
+            similarity_score float  0.0-1.0 (highest match against comparison pool)
+            matched_domain  str  the closest matching domain
+            signals         list of human-readable detection notes
+            detection_method str
+        """
+        domain = self._normalize(url)
+        if not domain:
+            return self._build_result(0, [], "", 0.0, "invalid")
+
+        # Whitelist Check: If domain is a registered popular brand, it is Safe.
+        if domain in POPULAR_DOMAINS:
+            return self._build_result(0, ["Verified authentic popular brand domain."], domain, 1.0, "whitelist_bypass")
+
+        signals = []
+        score = 0
+
+        # Signal 1: Fuzzy similarity to known malicious / popular domains
+        similarity, matched = self._best_similarity(domain)
+        if similarity >= 0.85:
+            score += 45
+            signals.append(f"Very high similarity ({similarity:.0%}) to known domain: {matched}")
+        elif similarity >= 0.70:
+            score += 30
+            signals.append(f"High similarity ({similarity:.0%}) to known domain: {matched}")
+        elif similarity >= 0.55:
+            score += 15
+            signals.append(f"Moderate similarity ({similarity:.0%}) to domain: {matched}")
+
+        # Signal 2: Suspicious keyword in domain
+        kw_hits = self._suspicious_keywords(domain)
+        if kw_hits:
+            kw_score = min(25, len(kw_hits) * 12)
+            score += kw_score
+            signals.append(f"Suspicious keyword(s) detected: {', '.join(kw_hits)}")
+
+        # Signal 3: Suspicious TLD
+        if self._has_suspicious_tld(domain):
+            score += 15
+            signals.append(f"High-risk top-level domain detected")
+
+        # Signal 4: IP address used instead of domain
+        if self._is_ip_address(domain):
+            score += 20
+            signals.append("IP address used instead of domain name (common in phishing)")
+
+        # Signal 5: Excessive subdomain depth
+        depth_penalty = self._subdomain_depth_penalty(domain)
+        if depth_penalty > 0:
+            score += depth_penalty
+            signals.append("Excessive subdomain nesting detected")
+
+        # Signal 6: Hyphen abuse
+        if self._hyphen_abuse(domain):
+            score += 10
+            signals.append("Excessive hyphens detected (typosquatting pattern)")
+
+        # Signal 7: Homoglyph substitution
+        if self._has_homoglyphs(domain):
+            score += 15
+            signals.append("Lookalike character substitution detected (homoglyph attack)")
+
+        # Signal 8: Brand name in subdomain (not in SLD)
+        brand_hit = self._brand_in_subdomain(domain)
+        if brand_hit:
+            score += 20
+            signals.append(f"Brand name '{brand_hit}' embedded in subdomain (impersonation pattern)")
+
+        # Cap at 100
+        score = min(100, score)
+
+        if not signals:
+            signals.append("No suspicious patterns detected")
+
+        return self._build_result(score, signals, matched, similarity, "similarity_analysis")
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _normalize(url: str) -> str:
+        url = url.strip()
+        if not url.startswith(("http://", "https://")):
+            url = "http://" + url
+        try:
+            parsed = urlparse(url)
+            domain = parsed.netloc or parsed.path.split("/")[0]
+            domain = domain.split(":")[0].lower()
+            if domain.startswith("www."):
+                domain = domain[4:]
+            return domain
+        except Exception:
+            return url.lower()
+
+    def _best_similarity(self, domain: str) -> Tuple[float, str]:
+        """Return (best_ratio, matched_domain) from the comparison pool."""
+        best_ratio = 0.0
+        best_match = ""
+        # Also compare the "core" domain (strip popular TLDs for cleaner comparison)
+        core = re.sub(r"\.(com|org|net|io|co)$", "", domain)
+        for candidate in self._comparison_pool:
+            cand_core = re.sub(r"\.(com|org|net|io|co)$", "", candidate)
+            ratio = difflib.SequenceMatcher(None, core, cand_core).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_match = candidate
+        return round(best_ratio, 4), best_match
+
+    @staticmethod
+    def _suspicious_keywords(domain: str) -> List[str]:
+        hits = []
+        for kw in SUSPICIOUS_KEYWORDS:
+            if kw in domain:
+                hits.append(kw)
+        return hits
+
+    @staticmethod
+    def _has_suspicious_tld(domain: str) -> bool:
+        for tld in SUSPICIOUS_TLDS:
+            if domain.endswith(tld):
+                return True
+        return False
+
+    @staticmethod
+    def _is_ip_address(domain: str) -> bool:
+        return bool(re.match(r"^\d{1,3}(\.\d{1,3}){3}$", domain))
+
+    @staticmethod
+    def _subdomain_depth_penalty(domain: str) -> int:
+        parts = domain.split(".")
+        depth = len(parts)
+        if depth >= 5:
+            return 15
+        if depth >= 4:
+            return 8
+        return 0
+
+    @staticmethod
+    def _hyphen_abuse(domain: str) -> bool:
+        # More than 2 hyphens in the domain label is suspicious
+        sld = domain.split(".")[0]
+        return sld.count("-") > 2
+
+    @staticmethod
+    def _has_homoglyphs(domain: str) -> bool:
+        for fake, real in HOMOGLYPHS.items():
+            if fake in domain:
+                # Check if replacing the glyph produces a known word
+                candidate = domain.replace(fake, real)
+                if candidate != domain:
+                    return True
+        return False
+
+    @staticmethod
+    def _brand_in_subdomain(domain: str) -> Optional[str]:
+        parts = domain.split(".")
+        if len(parts) < 3:
+            return None
+        # The subdomains are everything before the last two parts (SLD + TLD)
+        subdomains = ".".join(parts[:-2])
+        for brand_domain in POPULAR_DOMAINS:
+            brand = brand_domain.split(".")[0]  # e.g., "paypal", "google"
+            if brand in subdomains:
+                return brand
+        return None
+
+    # ------------------------------------------------------------------
+    # Result builder
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_result(score: int, signals: List[str], matched: str,
+                      similarity: float, method: str) -> Dict:
+        level = "safe"
+        for lvl, (lo, hi) in RISK_LEVELS.items():
+            if lo <= score <= hi:
+                level = lvl
+                break
+        return {
+            "risk_score": score,
+            "risk_level": level,
+            "similarity_score": round(similarity, 4),
+            "matched_domain": matched,
+            "signals": signals,
+            "detection_method": method,
+        }
+
+
+def get_risk_label(risk_level: str) -> str:
+    """Human-readable label for a risk level string."""
+    return {
+        "safe": "Safe",
+        "low": "Low Risk",
+        "medium": "Medium Risk",
+        "high": "High Risk",
+        "malicious": "Malicious",
+    }.get(risk_level, "Unknown")
+
+
+def get_risk_color(risk_level: str) -> str:
+    """Bootstrap / CSS color class for a given risk level."""
+    return {
+        "safe": "#00ff88",
+        "low": "#88ff00",
+        "medium": "#ffaa00",
+        "high": "#ff6600",
+        "malicious": "#ff3366",
+    }.get(risk_level, "#aaaaaa")

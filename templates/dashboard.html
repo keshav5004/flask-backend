@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% set active_page = 'dashboard' %}
+
+{% block title %}Engine Telemetry Dashboard - WebShield{% endblock %}
+
+{% block content %}
+<!-- Stats Summary Row -->
+<div class="row g-4 mb-5">
+    <div class="col-6 col-md-3">
+        <div class="cyber-card p-4 text-center">
+            <div class="stat-card-title mb-1">Total Scans</div>
+            <div class="stat-card-value text-info font-monospace">{{ stats.total_scanned }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="cyber-card p-4 text-center">
+            <div class="stat-card-title mb-1">Malicious Found</div>
+            <div class="stat-card-value text-danger font-monospace">{{ stats.total_malicious }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="cyber-card p-4 text-center">
+            <div class="stat-card-title mb-1">Clean Websites</div>
+            <div class="stat-card-value text-success font-monospace">{{ stats.total_safe }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="cyber-card p-4 text-center">
+            <div class="stat-card-title mb-1">Detection Rate</div>
+            <div class="stat-card-value text-warning font-monospace">{{ stats.detection_rate }}%</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Container Row -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-6">
+        <div class="cyber-card p-4">
+            <h5 class="fw-bold text-uppercase tracking-wider font-monospace text-info mb-4">Risk Level Distribution</h5>
+            <div style="height: 300px; position: relative;">
+                <canvas id="riskChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="cyber-card p-4">
+            <h5 class="fw-bold text-uppercase tracking-wider font-monospace text-info mb-4">Scan Trend Timeline</h5>
+            <div style="height: 300px; position: relative;">
+                <canvas id="scanChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History Log Table -->
+<div class="cyber-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h5 class="fw-bold text-uppercase tracking-wider font-monospace text-info mb-0">Recent Analysis Logs</h5>
+        <div class="badge bg-secondary bg-opacity-25 border border-secondary border-opacity-25 font-monospace">SQLite Database Store</div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="cyber-table">
+            <thead>
+                <tr>
+                    <th>URL Path Scanned</th>
+                    <th>Safety Status</th>
+                    <th>Risk Score</th>
+                    <th>Method</th>
+                    <th>Timestamp (UTC)</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if history %}
+                    {% for row in history %}
+                    <tr>
+                        <td class="font-monospace text-white text-truncate" style="max-width: 250px;">
+                            {{ row.url }}
+                        </td>
+                        <td>
+                            <span class="badge-cyber {{ row.risk_level.lower() }}">
+                                {{ row.risk_level.upper() }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="font-monospace fw-bold text-white">{{ row.risk_score }}</span>
+                        </td>
+                        <td class="small text-secondary">
+                            {% if row.detection_method == 'exact' %}
+                            Blacklist Exact
+                            {% else %}
+                            Heuristics Similarity
+                            {% endif %}
+                        </td>
+                        <td class="small text-secondary font-monospace">{{ row.timestamp }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('scan_result_view', id=row.id) }}" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1 font-monospace" style="font-size:0.75rem">
+                                Telemetry <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-5">
+                            <i class="fas fa-shield-alt fa-3x mb-3 text-opacity-25 text-white"></i>
+                            <p class="mb-0">No scan history recorded in SQLite log database.</p>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Custom Dashboard Logic -->
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

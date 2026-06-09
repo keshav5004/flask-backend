@@ -1,0 +1,75 @@
+# Flask Website Safety Checker Backend Implementation Plan
+
+This plan outlines the architecture and implementation details for a Flask REST API backend that checks website domains against a local blacklist.
+
+## Proposed Changes
+
+We will create a structured Python Flask project in the workspace `c:\web dev\flask backend` containing the following components:
+
+```
+c:\web dev\flask backend\
+├── app.py
+├── requirements.txt
+├── data\
+│   └── malicious_urls.csv
+└── services\
+    ├── __init__.py
+    └── checker.py
+```
+
+---
+
+### Backend Components
+
+#### [NEW] [requirements.txt](file:///c:/web%20dev/flask%20backend/requirements.txt)
+Defines project dependencies.
+- `Flask`: Core web framework.
+- `Flask-Cors`: Enables cross-origin requests from separate frontend applications.
+
+#### [NEW] [malicious_urls.csv](file:///c:/web%20dev/flask%20backend/data/malicious_urls.csv)
+A CSV dataset storing malicious URLs with a `url` header column. We will populate it with a few common test malicious domains.
+
+#### [NEW] [checker.py](file:///c:/web%20dev/flask%20backend/services/checker.py)
+Implements domain URL parsing, normalization, and blacklist matching.
+- **Normalization logic**:
+  - Trims whitespace.
+  - Ensures a scheme is prepended so `urllib.parse` handles it correctly.
+  - Extracts the domain name (netloc/path).
+  - Strips the `www.` prefix and port if present.
+  - Returns lowercase normalized domain name.
+- **Service Design**:
+  - `BaseChecker` abstract base class to allow extension for future checkers (e.g., ML-based models, external API lookups).
+  - `CSVBlacklistChecker` implementation loading CSV lines into a memory-efficient `set` for $O(1)$ lookup time.
+
+#### [NEW] [app.py](file:///c:/web%20dev/flask%20backend/app.py)
+The Flask application driver.
+- Configures CORS.
+- Initializes the `CSVBlacklistChecker` with the path to the CSV file.
+- Handles initialization failure (e.g., missing CSV file) using a pre-request hook to guarantee proper JSON response instead of a crash.
+- Implements the `/scan` POST endpoint accepting JSON body `{"url": "..."}`.
+- Implements comprehensive error handling:
+  - 400 Bad Request: Missing URL, invalid JSON type, or malformed JSON payloads.
+  - 500 Internal Server Error: Missing dataset, reader issues, or unexpected runtime exceptions.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+We will write a python script `test_app.py` in the workspace to programmatically test all scenarios, verifying:
+- Scan endpoint with safe URLs.
+- Scan endpoint with malicious URLs.
+- Scan endpoint with invalid input format (missing URL, non-string URL, invalid JSON).
+- Error handling behavior when the dataset file is deleted/missing.
+
+### Manual Verification
+We will run the server using python and send HTTP requests using `Invoke-RestMethod` / `curl` commands to test the endpoints and verify response status codes and body structure.
+- Running command: `python app.py` (with standard environment variables)
+- API Request tests:
+  ```powershell
+  # Safe domain check
+  Invoke-RestMethod -Uri "http://127.0.0.1:5000/scan" -Method Post -Body '{"url": "https://google.com/path"}' -ContentType "application/json"
+  
+  # Malicious domain check
+  Invoke-RestMethod -Uri "http://127.0.0.1:5000/scan" -Method Post -Body '{"url": "http://www.malicious-example.com"}' -ContentType "application/json"
+  ```

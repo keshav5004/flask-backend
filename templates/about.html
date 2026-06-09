@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% set active_page = 'about' %}
+
+{% block title %}Engine Mechanism & Telemetry - WebShield{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Engine Overview Card -->
+    <div class="col-lg-8">
+        <div class="cyber-card p-4 p-md-5">
+            <h2 class="fw-bold mb-3 text-white">Detection Engine Mechanics</h2>
+            <p class="lead text-secondary mb-4">
+                WebShield utilizes a multi-layered approach to evaluate the safety profile of a website domain. The algorithm is split into two primary phases: Exact Match Lookup and Heuristic Similarity Scanning.
+            </p>
+
+            <hr class="border-secondary border-opacity-25 my-4">
+
+            <div class="mb-5">
+                <h4 class="fw-bold text-info mb-3">1. Exact Match Threat Database</h4>
+                <p class="text-secondary">
+                    Every input URL is first parsed and normalized into its base domain. This removes the subdomains (e.g. <code>www.</code>), path endpoints, request queries, and ports to get a standardized hostname (e.g. <code>unsafe-portal.co.uk</code>).
+                </p>
+                <p class="text-secondary">
+                    The engine queries an in-memory threat cache loaded directly from the system database. If the normalized domain exists in the blacklist, it is flagged as <strong>Malicious</strong> (100% Risk Score) instantly.
+                </p>
+            </div>
+
+            <div class="mb-5">
+                <h4 class="fw-bold text-info mb-3">2. Similarity & Typo Heuristics</h4>
+                <p class="text-secondary">
+                    If no exact match exists, the system passes the domain into the <strong>Similarity Checker Engine</strong>, which scans for active typosquatting and impersonation indicators:
+                </p>
+                <ul class="text-secondary d-flex flex-column gap-2 list-unstyled ps-1">
+                    <li>
+                        <i class="fas fa-microchip text-warning me-2"></i>
+                        <strong>Fuzzy String Matching:</strong> Computes the Levenshtein-like distance ratios against top high-traffic brands and existing blacklisted targets.
+                    </li>
+                    <li>
+                        <i class="fas fa-font text-warning me-2"></i>
+                        <strong>Homoglyph Detection:</strong> Scans for lookalike character mappings (such as Latin <code>o</code> swapped with Cyrillic characters, or substituting <code>rn</code> for <code>m</code>).
+                    </li>
+                    <li>
+                        <i class="fas fa-network-wired text-warning me-2"></i>
+                        <strong>Subdomain Nesting:</strong> High frequency of subdomains (e.g. <code>paypal.com.verify-login.net</code>) triggers brand impersonation alerts.
+                    </li>
+                    <li>
+                        <i class="fas fa-percentage text-warning me-2"></i>
+                        <strong>Keyword Flagging:</strong> Matches typical phrases used in social engineering links (e.g. <code>secure</code>, <code>signin</code>, <code>alert</code>, <code>recover</code>).
+                    </li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="fw-bold text-info mb-3">3. Composite Risk Index (CRI)</h4>
+                <p class="text-secondary mb-0">
+                    A cumulative risk score is calculated on a scale of 0 to 100. Based on this value, the domain is classified into one of the following five security ratings:
+                </p>
+                <div class="row g-2 mt-3">
+                    <div class="col-4 col-md"><div class="badge-cyber safe text-center py-2 w-100">Safe (0-20)</div></div>
+                    <div class="col-4 col-md"><div class="badge-cyber low text-center py-2 w-100">Low (21-40)</div></div>
+                    <div class="col-4 col-md"><div class="badge-cyber medium text-center py-2 w-100">Medium (41-60)</div></div>
+                    <div class="col-4 col-md"><div class="badge-cyber high text-center py-2 w-100">High (61-80)</div></div>
+                    <div class="col-4 col-md"><div class="badge-cyber malicious text-center py-2 w-100">Malicious (81-100)</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tech Stack Sidebar -->
+    <div class="col-lg-4">
+        <div class="cyber-card p-4 mb-4">
+            <h5 class="fw-bold text-uppercase tracking-wider font-monospace text-info mb-4">Engine Tech Stack</h5>
+            
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="bg-primary bg-opacity-10 p-2 rounded-3 text-primary"><i class="fab fa-python fa-2x"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">Python Flask</h6>
+                    <small class="text-secondary">Routing & Core API Server</small>
+                </div>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="bg-success bg-opacity-10 p-2 rounded-3 text-success"><i class="fas fa-database fa-2x"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">SQLite DB</h6>
+                    <small class="text-secondary">Scan Telemetry Records</small>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="bg-info bg-opacity-10 p-2 rounded-3 text-info"><i class="fab fa-js-square fa-2x"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">AJAX Fetch API</h6>
+                    <small class="text-secondary">Dynamic UI State Scanning</small>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <div class="bg-warning bg-opacity-10 p-2 rounded-3 text-warning"><i class="fas fa-chart-pie fa-2x"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">Chart.js</h6>
+                    <small class="text-secondary">Data Visualizations</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="cyber-card p-4">
+            <h5 class="fw-bold text-uppercase tracking-wider font-monospace text-info mb-3">Project Status</h5>
+            <p class="text-secondary small mb-3">This project is designed as a college final-year cybersecurity capstone.</p>
+            <div class="d-flex justify-content-between text-secondary small mb-1">
+                <span>Database Engine:</span>
+                <span class="text-white">Active</span>
+            </div>
+            <div class="d-flex justify-content-between text-secondary small mb-1">
+                <span>Dataset CSV Size:</span>
+                <span class="text-white">{{ dataset_count }} URLs</span>
+            </div>
+            <div class="d-flex justify-content-between text-secondary small">
+                <span>Risk Calculations:</span>
+                <span class="text-white">Heuristic / Fuzzy</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

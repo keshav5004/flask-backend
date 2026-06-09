@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% set active_page = 'home' %}
+
+{% block title %}Scan Telemetry Report - WebShield{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+        <i class="fas fa-arrow-left me-1"></i> Scan Another URL
+    </a>
+</div>
+
+<div class="cyber-card p-4 p-md-5">
+    <div class="row align-items-center">
+        <!-- Left Info Panel -->
+        <div class="col-md-7 mb-4 mb-md-0">
+            <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+                <span id="safety-badge" class="badge-cyber {{ scan.risk_level.lower() }}">{{ scan.risk_level.upper() }}</span>
+                <h2 class="fw-bold mb-0 text-white truncate-url-title">
+                    <a href="{{ 'http://' + scan.url if not scan.url.startswith('http') else scan.url }}" target="_blank" class="text-decoration-none text-white hover-underline-cyan">
+                        {{ scan.url }}
+                    </a>
+                </h2>
+            </div>
+            
+            <h4 class="fw-bold text-white mb-2">Website Status: {{ scan.risk_level.upper() }}</h4>
+            <p class="text-secondary mb-4">
+                {% if scan.status == 'malicious' and scan.detection_method == 'exact' %}
+                This URL exists directly inside the malicious blacklists database. Warning: Do not visit this site.
+                {% elif scan.status == 'malicious' %}
+                High threat index matched on this website's domain during analysis.
+                {% else %}
+                Threat evaluation indicates a safe domain configuration with low threat metrics.
+                {% endif %}
+            </p>
+            
+            <h5 class="text-uppercase tracking-wider fw-bold text-info mb-3 font-monospace" style="font-size:0.85rem">Detected Risk Heuristic Signals</h5>
+            <ul class="list-group list-group-flush mb-0">
+                {% if scan.signals %}
+                    {% for sig in scan.signals.split('; ') %}
+                        <li class="list-group-item bg-transparent text-light border-0 ps-0 d-flex align-items-center gap-2">
+                            <i class="fas fa-exclamation-triangle" style="color: {{ risk_color }}"></i> 
+                            <span>{{ sig }}</span>
+                        </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="list-group-item bg-transparent text-secondary border-0 ps-0">No risk patterns triggered.</li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- Right Risk Gauge Dial -->
+        <div class="col-md-5 text-center border-start border-secondary border-opacity-10 ps-md-4">
+            <h5 class="text-secondary text-uppercase tracking-wider font-monospace mb-4">Risk Severity Meter</h5>
+            
+            <!-- Gauge Widget -->
+            <div class="gauge-container mb-3">
+                <div class="gauge-body"></div>
+                <div id="risk-dial-fill" class="gauge-fill" style="transform: rotate({{ -45 + (180 * (scan.risk_score / 100)) }}deg); border-color: {{ risk_color }};"></div>
+            </div>
+            
+            <div class="mt-2">
+                <span class="display-4 fw-extrabold font-monospace" style="color: {{ risk_color }};">{{ scan.risk_score }}</span>
+                <span class="text-secondary fs-5">/ 100</span>
+            </div>
+            <div class="text-uppercase tracking-widest font-monospace fw-bold small mt-1" style="color: {{ risk_color }};">{{ scan.risk_level }} Level</div>
+
+            <div class="row g-2 mt-4 pt-3 border-top border-secondary border-opacity-10 text-start">
+                <div class="col-6">
+                    <div class="small text-secondary">Similarity Index</div>
+                    <div class="fw-bold text-white font-monospace">{{ (scan.similarity_score * 100) | round(1) }}%</div>
+                </div>
+                <div class="col-6">
+                    <div class="small text-secondary">Close Match</div>
+                    <div class="fw-bold text-white font-monospace">{{ scan.matched_domain if scan.matched_domain else 'None' }}</div>
+                </div>
+                <div class="col-12 mt-2">
+                    <div class="small text-secondary">Detection Method</div>
+                    <div class="fw-bold text-white font-monospace">
+                        {% if scan.detection_method == 'exact' %}
+                        Blacklist Exact Database
+                        {% else %}
+                        Similarity & Typosquatting Match
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

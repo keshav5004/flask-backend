@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% set active_page = 'home' %}
+
+{% block content %}
+<div class="row align-items-center mb-5">
+    <div class="col-lg-6 mb-4 mb-lg-0">
+        <div class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-20 mb-3 px-3 py-2 rounded-pill font-monospace">
+            <i class="fas fa-biohazard me-2"></i> THREAT SHIELD ACTIVE
+        </div>
+        <h1 class="hero-title mb-3">Phishing & Malware Detection</h1>
+        <p class="hero-subtitle mb-4">
+            Protect your system from lookalike domains, credential phishing, and typosquatting attacks. Input any website address below to instantly scan its authenticity using fuzzy heuristic score matching.
+        </p>
+        
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="d-flex align-items-center gap-2 text-secondary">
+                    <i class="fas fa-check-circle text-info"></i>
+                    <span>Real-time Blacklist matching</span>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="d-flex align-items-center gap-2 text-secondary">
+                    <i class="fas fa-check-circle text-info"></i>
+                    <span>Similarity heuristics</span>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="d-flex align-items-center gap-2 text-secondary">
+                    <i class="fas fa-check-circle text-info"></i>
+                    <span>Fuzzy Risk scoring</span>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="d-flex align-items-center gap-2 text-secondary">
+                    <i class="fas fa-check-circle text-info"></i>
+                    <span>Detailed telemetry reports</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6" id="scanner-section">
+        <div class="cyber-card p-4 text-center">
+            <div class="cyber-icon-large mb-3">
+                <i class="fas fa-user-secret"></i>
+            </div>
+            <h3 class="fw-bold mb-2 text-uppercase tracking-wide">Secure Scanner Gate</h3>
+            <p class="text-secondary small">Verify suspicious URLs before clicking or inputting credentials</p>
+
+            <form id="scan-form" class="mt-4">
+                <div class="scanner-wrapper">
+                    <div class="input-group">
+                        <input type="text" id="url-input" class="form-control scanner-input" placeholder="Enter website URL (e.g. google.com or paypa1-auth.xyz)" required autocomplete="off">
+                        <button type="submit" id="scan-btn" class="btn scanner-btn">
+                            <span id="scan-btn-text">Scan URL</span>
+                            <i id="scan-btn-icon" class="fas fa-shield-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Loading State Section -->
+<div id="loading-section" class="d-none text-center my-5 py-4">
+    <div class="scan-spinner"></div>
+    <h5 class="pulse-text mb-2">Analyzing Threat Database...</h5>
+    <p class="text-secondary">Evaluating domain lexical structure, resolving TLD ratings, and matching similarity hashes</p>
+</div>
+
+<!-- Inline Scan Results Section -->
+<div id="results-section" class="d-none my-5">
+    <div class="cyber-card p-4 p-md-5">
+        <div class="row align-items-center">
+            <!-- Left Info Panel -->
+            <div class="col-md-7 mb-4 mb-md-0">
+                <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+                    <span id="safety-badge" class="badge-cyber">Safe</span>
+                    <h2 class="fw-bold mb-0 text-white truncate-url-title">
+                        <a href="#" id="result-url" target="_blank" class="text-decoration-none text-white hover-underline-cyan">site.com</a>
+                    </h2>
+                </div>
+                
+                <h4 id="safety-status-text" class="fw-bold text-white mb-2">Website Status: Safe</h4>
+                <p id="safety-message" class="text-secondary mb-4">The website domain is clean of active threat flags and has a low phishing similarity index.</p>
+                
+                <h5 class="text-uppercase tracking-wider fw-bold text-info mb-3 font-monospace" style="font-size:0.85rem">Detected Risk Signals</h5>
+                <ul id="signal-list" class="list-group list-group-flush mb-0">
+                    <!-- Dynamic List of heuristics signals -->
+                </ul>
+            </div>
+
+            <!-- Right Risk Gauge Dial -->
+            <div class="col-md-5 text-center border-start border-secondary border-opacity-10 ps-md-4">
+                <h5 class="text-secondary text-uppercase tracking-wider font-monospace mb-4">Risk Severity Meter</h5>
+                
+                <!-- Gauge Widget -->
+                <div class="gauge-container mb-3">
+                    <div class="gauge-body"></div>
+                    <div id="risk-dial-fill" class="gauge-fill"></div>
+                </div>
+                
+                <div class="mt-2">
+                    <span id="risk-score-value" class="display-4 fw-extrabold font-monospace">0</span>
+                    <span class="text-secondary fs-5">/ 100</span>
+                </div>
+                <div id="risk-score-level" class="text-uppercase tracking-widest font-monospace fw-bold small mt-1">Safe Level</div>
+
+                <div class="row g-2 mt-4 pt-3 border-top border-secondary border-opacity-10 text-start">
+                    <div class="col-6">
+                        <div class="small text-secondary">Similarity Index</div>
+                        <div id="similarity-score-val" class="fw-bold text-white font-monospace">0.0%</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-secondary">Close Match</div>
+                        <div id="matched-domain-val" class="fw-bold text-white font-monospace">None</div>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <div class="small text-secondary">Detection Method</div>
+                        <div id="detection-method-val" class="fw-bold text-white font-monospace">Blacklist Exact</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Threat Matrix Overview -->
+<div class="row g-4 mt-5">
+    <div class="col-md-4">
+        <div class="cyber-card p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="bg-info bg-opacity-10 p-3 rounded-3 text-info">
+                    <i class="fas fa-project-diagram fa-2x"></i>
+                </div>
+                <h5 class="fw-bold mb-0">Typo-squatting Shield</h5>
+            </div>
+            <p class="text-secondary mb-0">
+                Detects characters designed to trick you, such as <code>paypa1.com</code> or <code>rnicrosoft.com</code>.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="cyber-card p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="bg-info bg-opacity-10 p-3 rounded-3 text-info">
+                    <i class="fas fa-search-dollar fa-2x"></i>
+                </div>
+                <h5 class="fw-bold mb-0">Brand Impersonation</h5>
+            </div>
+            <p class="text-secondary mb-0">
+                Identifies subdomains trying to look like famous brand names (e.g. <code>secure.google.com.attacker.xyz</code>).
+            </p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="cyber-card p-4 h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="bg-info bg-opacity-10 p-3 rounded-3 text-info">
+                    <i class="fas fa-radiation fa-2x"></i>
+                </div>
+                <h5 class="fw-bold mb-0">Domain TLD Ratings</h5>
+            </div>
+            <p class="text-secondary mb-0">
+                Scans registry reputation and rates domain endings commonly registered for malware distribution.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
