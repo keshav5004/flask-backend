@@ -101,7 +101,7 @@ class SimilarityChecker:
 
         # Whitelist Check: If domain is a registered popular brand, it is Safe.
         if domain in POPULAR_DOMAINS:
-            return self._build_result(0, ["Verified authentic popular brand domain."], domain, 1.0, "whitelist_bypass")
+            return self._build_result(0, ["This is a verified and trusted website."], domain, 1.0, "whitelist_bypass")
 
         signals = []
         score = 0
@@ -110,58 +110,58 @@ class SimilarityChecker:
         similarity, matched = self._best_similarity(domain)
         if similarity >= 0.85:
             score += 45
-            signals.append(f"Very high similarity ({similarity:.0%}) to known domain: {matched}")
+            signals.append(f"This website looks very similar ({similarity:.0%} match) to a known dangerous site: {matched}")
         elif similarity >= 0.70:
             score += 30
-            signals.append(f"High similarity ({similarity:.0%}) to known domain: {matched}")
+            signals.append(f"This website closely resembles ({similarity:.0%} match) a known dangerous site: {matched}")
         elif similarity >= 0.55:
             score += 15
-            signals.append(f"Moderate similarity ({similarity:.0%}) to domain: {matched}")
+            signals.append(f"This website somewhat resembles ({similarity:.0%} match) a known site: {matched}")
 
         # Signal 2: Suspicious keyword in domain
         kw_hits = self._suspicious_keywords(domain)
         if kw_hits:
             kw_score = min(25, len(kw_hits) * 12)
             score += kw_score
-            signals.append(f"Suspicious keyword(s) detected: {', '.join(kw_hits)}")
+            signals.append(f"Contains risky words often used by fake websites: {', '.join(kw_hits)}")
 
         # Signal 3: Suspicious TLD
         if self._has_suspicious_tld(domain):
             score += 15
-            signals.append(f"High-risk top-level domain detected")
+            signals.append(f"Uses a web address ending that is commonly used by scam websites")
 
         # Signal 4: IP address used instead of domain
         if self._is_ip_address(domain):
             score += 20
-            signals.append("IP address used instead of domain name (common in phishing)")
+            signals.append("Uses a number-based address instead of a normal website name — a common trick used by fake sites")
 
         # Signal 5: Excessive subdomain depth
         depth_penalty = self._subdomain_depth_penalty(domain)
         if depth_penalty > 0:
             score += depth_penalty
-            signals.append("Excessive subdomain nesting detected")
+            signals.append("Website address is unusually long and complex — often a sign of a fake site")
 
         # Signal 6: Hyphen abuse
         if self._hyphen_abuse(domain):
             score += 10
-            signals.append("Excessive hyphens detected (typosquatting pattern)")
+            signals.append("Website name contains too many dashes — a common trick to mimic real websites")
 
         # Signal 7: Homoglyph substitution
         if self._has_homoglyphs(domain):
             score += 15
-            signals.append("Lookalike character substitution detected (homoglyph attack)")
+            signals.append("Website name uses look-alike characters to impersonate a real website")
 
         # Signal 8: Brand name in subdomain (not in SLD)
         brand_hit = self._brand_in_subdomain(domain)
         if brand_hit:
             score += 20
-            signals.append(f"Brand name '{brand_hit}' embedded in subdomain (impersonation pattern)")
+            signals.append(f"Tries to look like '{brand_hit}' but is not the official website")
 
         # Cap at 100
         score = min(100, score)
 
         if not signals:
-            signals.append("No suspicious patterns detected")
+            signals.append("No warning signs found — this website appears safe")
 
         return self._build_result(score, signals, matched, similarity, "similarity_analysis")
 

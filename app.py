@@ -162,7 +162,7 @@ def scan_url():
         risk_level = "malicious"
         similarity_score = 1.0
         matched_domain = normalized
-        signals = ["Domain matched exact entry in malware blacklist database"]
+        signals = ["This website is a known dangerous site — do not enter any personal information"]
         detection_method = "exact"
         status = "malicious"
         message = "Website found in exact blacklist. Danger: Do not visit."
@@ -209,6 +209,57 @@ def scan_url():
         "detection_method": detection_method,
         "signals": signals,
         "message": message
+    }), 200
+
+
+@app.route('/api/check', methods=['GET'])
+def api_check_url():
+    """
+    Lightweight GET endpoint for the Chrome Extension.
+    Only checks exact blacklist matches — no similarity analysis.
+    Does NOT save to scan history to avoid polluting the database
+    with automatic background scans from the extension.
+    """
+    url = request.args.get('url')
+    if not url:
+        return jsonify({
+            "error": "Bad Request",
+            "message": "Missing required query parameter: 'url'"
+        }), 400
+
+    normalized = checker.normalize_url(url)
+    if not normalized:
+        return jsonify({
+            "error": "Bad Request",
+            "message": "The provided URL could not be parsed."
+        }), 400
+
+    is_blacklisted = checker.is_malicious(url)
+
+    if is_blacklisted:
+        return jsonify({
+            "url": url,
+            "normalized_url": normalized,
+            "status": "malicious",
+            "safe": False,
+            "risk_score": 100,
+            "risk_level": "malicious",
+            "detection_method": "exact",
+            "signals": ["This website is a known dangerous site — do not enter any personal information"],
+            "message": "PHISHING WEBSITE DETECTED - Do not visit."
+        }), 200
+
+    # Not in blacklist — website is safe
+    return jsonify({
+        "url": url,
+        "normalized_url": normalized,
+        "status": "safe",
+        "safe": True,
+        "risk_score": 0,
+        "risk_level": "safe",
+        "detection_method": "exact",
+        "signals": ["No warning signs found — this website appears safe"],
+        "message": "Website is safe."
     }), 200
 
 
