@@ -55,7 +55,17 @@ class TestWebsiteSafetyChecker(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['status'], 'malicious')
+    def test_api_check_suspicious(self):
+        """
+        Test the GET /api/check endpoint for a suspicious lookalike URL using new TLDs/keywords.
+        """
+        response = self.client.get('/api/check?url=test-paypal-billing-verify.vip')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['status'], 'malicious')
         self.assertFalse(data['safe'])
+        self.assertGreaterEqual(data['risk_score'], 40)
+        self.assertEqual(data['detection_method'], 'similarity_analysis')
 
     def test_missing_url_field(self):
         """

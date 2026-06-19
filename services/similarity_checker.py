@@ -37,6 +37,18 @@ SUSPICIOUS_KEYWORDS = [
     "helpdesk", "password", "credential", "auth", "access", "validate",
     "recover", "unlock", "suspend", "limited", "alert", "urgent", "free",
     "winner", "prize", "reward", "bonus", "offer", "click", "download",
+    "billing", "invoice", "receipt", "payment", "refund", "charge", "overdue",
+    "statement", "portal", "service", "activation", "registration", "validation",
+    "verification", "two-factor", "2fa", "mfa", "document", "doc-share",
+    "file-access", "pdf-view", "shipping", "tracking", "delivery", "fedex",
+    "ups", "usps", "dhl", "post", "mail", "inbox", "webmail", "cpanel",
+    "outlook", "office365", "sharepoint", "onedrive", "chase", "wellsfargo",
+    "bankofamerica", "citibank", "hsbc", "barclays", "metamask", "coinbase",
+    "trustwallet", "binance", "ledger", "trezor", "phantom", "renew",
+    "subscription", "expiration", "alert-verify", "urgent-action", "free-gift",
+    "giftcard", "cashback", "reimbursement", "compensation", "webshield",
+    "security", "protection", "safety", "official-site", "real-signin",
+    "original-login"
 ]
 
 # TLDs commonly abused in phishing/spam campaigns
@@ -45,13 +57,18 @@ SUSPICIOUS_TLDS = {
     ".online", ".site", ".website", ".tech", ".link", ".info", ".bid",
     ".win", ".loan", ".date", ".faith", ".review", ".trade", ".webcam",
     ".stream", ".gdn", ".men", ".work", ".party", ".download",
+    ".pro", ".buzz", ".icu", ".rest", ".quest", ".cfd", ".sbs",
+    ".click", ".lol", ".zip", ".mov", ".life", ".fit", ".surf",
+    ".cc", ".cn", ".vip", ".bond", ".cam", ".shop", ".store", ".fun",
+    ".live", ".space", ".science", ".cricket", ".kim", ".xin", ".tokyo",
+    ".pub"
 }
 
 # Homoglyph map: lookalike Unicode/ASCII substitutions
 HOMOGLYPHS = {
     "0": "o", "1": "l", "3": "e", "4": "a", "5": "s",
     "6": "g", "7": "t", "8": "b", "9": "g",
-    "rn": "m", "vv": "w",
+    "rn": "m", "vv": "w", "l": "i", "i": "l", "cl": "d"
 }
 
 # Legitimate popular domains — used to detect brand impersonation
@@ -148,7 +165,7 @@ class SimilarityChecker:
 
         # Signal 7: Homoglyph substitution
         if self._has_homoglyphs(domain):
-            score += 15
+            score += 20
             signals.append("Website name uses look-alike characters to impersonate a real website")
 
         # Signal 8: Brand name in subdomain (not in SLD)
@@ -156,6 +173,18 @@ class SimilarityChecker:
         if brand_hit:
             score += 20
             signals.append(f"Tries to look like '{brand_hit}' but is not the official website")
+
+        # Signal 9: Gibberish / high-entropy domain name
+        if self._is_gibberish(domain):
+            score += 20
+            signals.append("Website name looks randomly generated — a strong indicator of a fake site")
+
+        # Multi-signal bonus: when 3+ weak signals combine, elevate the score
+        signal_count = len(signals)
+        if signal_count >= 4:
+            score += 15
+        elif signal_count >= 3:
+            score += 10
 
         # Cap at 100
         score = min(100, score)
@@ -229,9 +258,9 @@ class SimilarityChecker:
 
     @staticmethod
     def _hyphen_abuse(domain: str) -> bool:
-        # More than 2 hyphens in the domain label is suspicious
+        # 2 or more hyphens in the domain label is suspicious
         sld = domain.split(".")[0]
-        return sld.count("-") > 2
+        return sld.count("-") >= 2
 
     @staticmethod
     def _has_homoglyphs(domain: str) -> bool:
@@ -242,6 +271,33 @@ class SimilarityChecker:
                 if candidate != domain:
                     return True
         return False
+
+    @staticmethod
+    def _is_gibberish(domain: str) -> bool:
+        """
+        Detect randomly generated / gibberish domain names.
+        Checks for high consonant-to-vowel ratio and digit mixing.
+        """
+        sld = domain.split(".")[0].replace("-", "")
+        if len(sld) < 4:
+            return False
+
+        vowels = set("aeiou")
+        digits = sum(1 for c in sld if c.isdigit())
+        letters = sum(1 for c in sld if c.isalpha())
+        vowel_count = sum(1 for c in sld.lower() if c in vowels)
+
+        # Domain has mixed digits and letters (e.g., dstrb013, platfrme013)
+        has_mixed = digits >= 2 and letters >= 3
+
+        # Very low vowel ratio suggests consonant-heavy gibberish
+        vowel_ratio = vowel_count / max(letters, 1)
+        is_consonant_heavy = vowel_ratio < 0.2 and letters >= 5
+
+        # Long consonant sequences (3+ consonants in a row)
+        consonant_runs = len(re.findall(r'[b-df-hj-np-tv-z]{4,}', sld.lower()))
+
+        return has_mixed or is_consonant_heavy or consonant_runs >= 1
 
     @staticmethod
     def _brand_in_subdomain(domain: str) -> Optional[str]:

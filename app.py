@@ -215,8 +215,9 @@ def scan_url():
 @app.route('/api/check', methods=['GET'])
 def api_check_url():
     """
-    Lightweight GET endpoint for the Chrome Extension.
-    Only checks exact blacklist matches — no similarity analysis.
+    GET endpoint for the Chrome Extension.
+    Performs both exact blacklist matching AND similarity/heuristic analysis
+    to properly detect phishing sites that use lookalike domains.
     Does NOT save to scan history to avoid polluting the database
     with automatic background scans from the extension.
     """
@@ -234,6 +235,7 @@ def api_check_url():
             "message": "The provided URL could not be parsed."
         }), 400
 
+    # Level 1: Exact blacklist match
     is_blacklisted = checker.is_malicious(url)
 
     if is_blacklisted:
@@ -249,17 +251,29 @@ def api_check_url():
             "message": "PHISHING WEBSITE DETECTED - Do not visit."
         }), 200
 
-    # Not in blacklist — website is safe
+    # Level 2: Similarity & heuristic analysis
+    analysis = similarity_checker.analyze(url)
+    risk_score = analysis["risk_score"]
+    risk_level = analysis["risk_level"]
+    status = "malicious" if risk_level in ["high", "malicious"] else "safe"
+
+    if risk_level == "safe":
+        message = "Website is safe."
+    else:
+        message = f"Suspicious activity index: {risk_level.upper()} threat rating."
+
     return jsonify({
         "url": url,
         "normalized_url": normalized,
-        "status": "safe",
-        "safe": True,
-        "risk_score": 0,
-        "risk_level": "safe",
-        "detection_method": "exact",
-        "signals": ["No warning signs found — this website appears safe"],
-        "message": "Website is safe."
+        "status": status,
+        "safe": status == "safe",
+        "risk_score": risk_score,
+        "risk_level": risk_level,
+        "similarity_score": analysis["similarity_score"],
+        "matched_domain": analysis["matched_domain"],
+        "detection_method": analysis["detection_method"],
+        "signals": analysis["signals"],
+        "message": message
     }), 200
 
 

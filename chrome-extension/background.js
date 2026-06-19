@@ -8,7 +8,7 @@
  *    messaging the content script to inject/remove warning overlays
  */
 
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = "https://flask-backend-52nr.onrender.com";
 const CHECK_ENDPOINT = `${API_BASE}/api/check`;
 
 // Cache TTL: avoid re-scanning the same URL within 5 minutes
@@ -16,6 +16,59 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Risk score threshold: any score >= this value is treated as unsafe
 const UNSAFE_THRESHOLD = 40;
+
+// Chrome security interstitial keywords in tab titles
+const CHROME_WARNING_KEYWORDS = [
+  "deceptive site",
+  "dangerous site",
+  "privacy error",
+  "connection is not private",
+  "site ahead contains",
+  "phishing warning",
+  "malware warning",
+  "suspicious site",
+  "security warning"
+];
+
+/**
+ * Check if a tab title matches common Chrome security warnings.
+ */
+function isChromeWarningTitle(title) {
+  if (!title) return false;
+  const lowerTitle = title.toLowerCase();
+  return CHROME_WARNING_KEYWORDS.some(keyword => lowerTitle.includes(keyword));
+}
+
+/**
+ * Handle tabs where Chrome itself has flagged the page as unsafe.
+ */
+async function handleChromeWarning(tabId, url) {
+  const chromeUnsafeResult = {
+    url: url,
+    status: "unsafe",
+    safe: false,
+    risk_score: 99,
+    risk_level: "dangerous",
+    detection_method: "chrome_safe_browsing",
+    signals: ["Google Chrome Safe Browsing flagged this website as dangerous/suspicious."],
+    message: "Google Chrome flagged this website as unsafe."
+  };
+  
+  const cacheKey = `cache_${url}`;
+  try {
+    await chrome.storage.local.set({
+      [cacheKey]: { result: chromeUnsafeResult, timestamp: Date.now() },
+      latestResult: chromeUnsafeResult
+    });
+  } catch (e) {
+    console.error("[WebShield] Local storage write failed:", e);
+  }
+  
+  updateBadge(tabId, chromeUnsafeResult);
+  notifyContentScript(tabId, chromeUnsafeResult);
+  showPhishingNotification(url, chromeUnsafeResult);
+}
+
 
 // URLs we should never scan (internal browser pages)
 const SKIP_PREFIXES = [
@@ -168,6 +221,17 @@ async function scanTab(tabId, url) {
     return;
   }
 
+  // Check if Chrome itself flagged this tab via title
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab && tab.title && isChromeWarningTitle(tab.title)) {
+      await handleChromeWarning(tabId, url);
+      return;
+    }
+  } catch (e) {
+    // Tab info query might fail if tab is closed or during early load
+  }
+
   // Trusted domains (and all their subdomains) are always safe — no API call needed
   if (isTrustedDomain(url)) {
     const safeResult = {
@@ -238,6 +302,13 @@ async function scanTab(tabId, url) {
  * Trigger scan when a page finishes loading.
  */
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Check if Chrome itself flagged it (via tab title)
+  const title = tab.title || changeInfo.title || "";
+  if (tab.url && !shouldSkip(tab.url) && isChromeWarningTitle(title)) {
+    handleChromeWarning(tabId, tab.url);
+    return;
+  }
+
   if (changeInfo.status === "complete" && tab.url) {
     scanTab(tabId, tab.url);
   }
