@@ -13,6 +13,38 @@
   // Risk score threshold: >= this value is treated as unsafe
   const UNSAFE_THRESHOLD = 40;
 
+  // Chrome security interstitial keywords in tab titles (multilingual support)
+  const CHROME_WARNING_KEYWORDS = [
+    // English
+    "deceptive site", "dangerous site", "privacy error", "connection is not private",
+    "site ahead contains", "phishing warning", "malware warning", "suspicious site",
+    "security warning", "security error",
+    // Hindi
+    "भ्रामक", "खतरनाक साइट", "गोपनीयता", "सुरक्षा चेतावनी",
+    // Spanish
+    "sitio engañoso", "sitio peligroso", "error de privacidad", "conexión no es privada",
+    "advertencia de seguridad",
+    // French
+    "site trompeur", "site dangerous", "erreur de confidentialité", "connexion n'est pas sécurisée",
+    "avertissement de sécurité",
+    // German
+    "irreführende", "gefährliche website", "datenschutzfehler", "sicherheitswarnung",
+    // Portuguese
+    "site enganoso", "site perigoso", "erro de privacidade", "conexão não é privada",
+    // Russian
+    "опасный сайт", "ошибка конфиденциальности", "подключение не защищено",
+    // Chinese
+    "欺骗性", "危险网站", "隐私权专有错误", "连接不是私密", "安全警告",
+    // Japanese
+    "偽のサイト", "危険なサイト", "プライバシーのエラー", "接続はプライベート", "セキュリティ警告"
+  ];
+
+  function isChromeWarningTitle(title) {
+    if (!title) return false;
+    const lowerTitle = title.toLowerCase();
+    return CHROME_WARNING_KEYWORDS.some(keyword => lowerTitle.includes(keyword));
+  }
+
   // DOM references
   const statusBadge = document.getElementById("status-badge");
   const statusRing = document.getElementById("status-ring");
@@ -41,6 +73,22 @@
         currentTabUrl = tab.url;
         currentUrlEl.textContent = truncateUrl(tab.url, 50);
         currentUrlEl.title = tab.url;
+
+        // Check if Chrome itself flagged this page via tab title
+        if (tab.title && isChromeWarningTitle(tab.title)) {
+          const chromeUnsafeResult = {
+            url: tab.url,
+            status: "unsafe",
+            safe: false,
+            risk_score: 99,
+            risk_level: "dangerous",
+            detection_method: "chrome_safe_browsing",
+            signals: ["Google Chrome Safe Browsing flagged this website as dangerous/suspicious."],
+            message: "Google Chrome flagged this website as unsafe."
+          };
+          renderResult(chromeUnsafeResult);
+          return;
+        }
 
         // Check if it's an internal page
         if (isInternalPage(tab.url)) {
@@ -213,7 +261,7 @@
 
   function isInternalPage(url) {
     const skip = ["chrome://", "chrome-extension://", "about:", "edge://",
-      "brave://", "devtools://", "view-source:", "data:", "blob:", "file://"];
+      "brave://", "devtools://", "view-source:", "data:", "blob:", "file://", "chrome-error://"];
     return skip.some(p => url.startsWith(p));
   }
 

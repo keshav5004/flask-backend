@@ -8,7 +8,7 @@
  *    messaging the content script to inject/remove warning overlays
  */
 
-const API_BASE = "https://flask-backend-52nr.onrender.com";
+const API_BASE = "https://flask-backend-52nr.onrender.com/";
 const CHECK_ENDPOINT = `${API_BASE}/api/check`;
 
 // Cache TTL: avoid re-scanning the same URL within 5 minutes
@@ -17,18 +17,32 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // Risk score threshold: any score >= this value is treated as unsafe
 const UNSAFE_THRESHOLD = 40;
 
-// Chrome security interstitial keywords in tab titles
+// Chrome security interstitial keywords in tab titles (multilingual support)
 const CHROME_WARNING_KEYWORDS = [
-  "deceptive site",
-  "dangerous site",
-  "privacy error",
-  "connection is not private",
-  "site ahead contains",
-  "phishing warning",
-  "malware warning",
-  "suspicious site",
-  "security warning"
+  // English
+  "deceptive site", "dangerous site", "privacy error", "connection is not private",
+  "site ahead contains", "phishing warning", "malware warning", "suspicious site",
+  "security warning", "security error",
+  // Hindi
+  "भ्रामक", "खतरनाक साइट", "गोपनीयता", "सुरक्षा चेतावनी",
+  // Spanish
+  "sitio engañoso", "sitio peligroso", "error de privacidad", "conexión no es privada",
+  "advertencia de seguridad",
+  // French
+  "site trompeur", "site dangerous", "erreur de confidentialité", "connexion n'est pas sécurisée",
+  "avertissement de sécurité",
+  // German
+  "irreführende", "gefährliche website", "datenschutzfehler", "sicherheitswarnung",
+  // Portuguese
+  "site enganoso", "site perigoso", "erro de privacidade", "conexão não é privada",
+  // Russian
+  "опасный сайт", "ошибка конфиденциальности", "подключение не защищено",
+  // Chinese
+  "欺骗性", "危险网站", "隐私权专有错误", "连接不是私密", "安全警告",
+  // Japanese
+  "偽のサイト", "危険なサイト", "プライバシーのエラー", "接続はプライベート", "セキュリティ警告"
 ];
+
 
 /**
  * Check if a tab title matches common Chrome security warnings.
@@ -74,7 +88,7 @@ async function handleChromeWarning(tabId, url) {
 const SKIP_PREFIXES = [
   "chrome://", "chrome-extension://", "about:", "edge://",
   "brave://", "devtools://", "view-source:", "data:", "blob:",
-  "file://", "chrome-search://", "new-tab-page"
+  "file://", "chrome-search://", "new-tab-page", "chrome-error://"
 ];
 
 // Trusted domains — these (and ALL their subdomains) are always safe.
