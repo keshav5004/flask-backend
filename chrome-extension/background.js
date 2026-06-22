@@ -346,6 +346,13 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
  * Listen for messages from popup requesting a fresh scan.
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "leave_site") {
+    if (sender.tab && sender.tab.id) {
+      chrome.tabs.update(sender.tab.id, { url: "chrome://newtab/" });
+    }
+    return;
+  }
+
   if (message.action === "force_scan" && message.url) {
     // Invalidate cache for this URL
     const cacheKey = `cache_${message.url}`;

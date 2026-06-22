@@ -95,6 +95,19 @@ class SimilarityChecker:
         self.blacklist = blacklist
         # Combine known-bad domains with popular targets for similarity comparison
         self._comparison_pool = list(blacklist) + POPULAR_DOMAINS
+        
+        # Precompute signatures for fast similarity searching
+        import re
+        self._comparison_cores = []
+        for cand in self._comparison_pool:
+            core = re.sub(r"\.(com|org|net|io|co)$", "", cand)
+            L2 = len(core)
+            S2 = set(core)
+            cand_dups = L2 - len(S2)
+            self._comparison_cores.append((cand, core, L2, S2, cand_dups))
+            
+        # Sort POPULAR_DOMAINS first so we prune search space quickly
+        self._comparison_cores.sort(key=lambda x: x[0] in POPULAR_DOMAINS, reverse=True)
 
     # ------------------------------------------------------------------
     # Public API
@@ -219,12 +232,37 @@ class SimilarityChecker:
         best_match = ""
         # Also compare the "core" domain (strip popular TLDs for cleaner comparison)
         core = re.sub(r"\.(com|org|net|io|co)$", "", domain)
-        for candidate in self._comparison_pool:
-            cand_core = re.sub(r"\.(com|org|net|io|co)$", "", candidate)
-            ratio = difflib.SequenceMatcher(None, core, cand_core).ratio()
+        L1 = len(core)
+        S1 = set(core)
+        L1_dups = L1 - len(S1)
+        
+        matcher = difflib.SequenceMatcher(None, core, "")
+        
+        for candidate, cand_core, L2, S2, cand_dups in self._comparison_cores:
+            # The current pruning threshold is the max of our base threshold (0.55) and the best ratio found so far
+            threshold = best_ratio if best_ratio > 0.55 else 0.55
+            
+            # Dynamic length range check:
+            # 2.0 * min(L1, L2) / (L1 + L2) >= threshold
+            min_len = (threshold / (2.0 - threshold)) * L1
+            max_len = ((2.0 - threshold) / threshold) * L1
+            if not (min_len <= L2 <= max_len):
+                continue
+                
+            # Dynamic character overlap bounds check
+            common_bound = len(S1 & S2) + (L1_dups if L1_dups < cand_dups else cand_dups)
+            if common_bound < 0.5 * threshold * (L1 + L2):
+                continue
+                
+            matcher.set_seq2(cand_core)
+            if matcher.quick_ratio() < threshold:
+                continue
+                
+            ratio = matcher.ratio()
             if ratio > best_ratio:
                 best_ratio = ratio
                 best_match = candidate
+                
         return round(best_ratio, 4), best_match
 
     @staticmethod

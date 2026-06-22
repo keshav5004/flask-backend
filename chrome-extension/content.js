@@ -267,7 +267,7 @@
 
     // Button handlers
     document.getElementById("ws-leave-btn").addEventListener("click", () => {
-      window.location.href = "about:blank";
+      chrome.runtime.sendMessage({ action: "leave_site" });
     });
 
     document.getElementById("ws-continue-btn").addEventListener("click", () => {
