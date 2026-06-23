@@ -116,11 +116,15 @@ const TRUSTED_DOMAINS = [
   "adobe.com",
   "cloudflare.com",
   "render.com",
+  "onrender.com",
   "vercel.app",
   "netlify.app",
   "herokuapp.com",
   "zoom.us",
   "slack.com",
+  "localhost",
+  "127.0.0.1",
+  "webshield.com"
 ];
 
 /**
@@ -149,8 +153,16 @@ function getRootDomain(url) {
  * Check if a URL belongs to a trusted domain (including subdomains).
  */
 function isTrustedDomain(url) {
-  const root = getRootDomain(url);
-  return TRUSTED_DOMAINS.includes(root);
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) {
+      return true;
+    }
+    const root = getRootDomain(url);
+    return TRUSTED_DOMAINS.includes(root) || TRUSTED_DOMAINS.includes(hostname);
+  } catch {
+    return false;
+  }
 }
 
 /**

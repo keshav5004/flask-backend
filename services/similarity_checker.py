@@ -129,8 +129,10 @@ class SimilarityChecker:
         if not domain:
             return self._build_result(0, [], "", 0.0, "invalid")
 
-        # Whitelist Check: If domain is a registered popular brand, it is Safe.
-        if domain in POPULAR_DOMAINS:
+        # Whitelist Check: If domain is a registered popular brand or local/development/stage host, it is Safe.
+        if (domain in POPULAR_DOMAINS or 
+            domain in ("localhost", "127.0.0.1", "onrender.com", "render.com", "webshield.com") or 
+            domain.endswith((".localhost", ".local", ".onrender.com", ".render.com", ".webshield.com"))):
             return self._build_result(0, ["This is a verified and trusted website."], domain, 1.0, "whitelist_bypass")
 
         signals = []

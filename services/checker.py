@@ -138,7 +138,9 @@ class CSVBlacklistChecker(BaseChecker):
         
         # Whitelist check for trusted popular domains to prevent false positives
         from services.similarity_checker import POPULAR_DOMAINS
-        if normalized in POPULAR_DOMAINS:
+        if (normalized in POPULAR_DOMAINS or 
+            normalized in ("localhost", "127.0.0.1", "onrender.com", "render.com", "webshield.com") or 
+            normalized.endswith((".localhost", ".local", ".onrender.com", ".render.com", ".webshield.com"))):
             return False
             
         return normalized in self.blacklist
